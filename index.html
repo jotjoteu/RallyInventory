@@ -572,6 +572,14 @@
     flex-wrap: wrap;
   }
 
+  /* HISTORY */
+  .history-action { font-size: 16px; }
+  .hist-ok { color: var(--ok); }
+  .hist-danger { color: var(--danger); }
+  .hist-warn { color: var(--warn); }
+  .hist-accent { color: var(--accent); }
+  .hist-blue { color: #5599ff; }
+
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: 1fr 1fr; }
@@ -597,6 +605,7 @@
   <button class="nav-btn" onclick="showView('calendar')" data-view="calendar">🗓 Kalendarz</button>
   <button class="nav-btn" onclick="showView('add')" data-view="add">➕ Dodaj</button>
   <button class="nav-btn" onclick="showView('export')" data-view="export">⬇ Export</button>
+  <button class="nav-btn" onclick="showView('history')" data-view="history">📜 Historia</button>
 </nav>
 
 <main>
@@ -796,6 +805,27 @@
     </div>
   </div>
 
+  <!-- HISTORY -->
+  <div class="view" id="view-history">
+    <div class="search-bar">
+      <input type="text" id="history-search" placeholder="Szukaj po nazwie produktu lub opisie..." oninput="renderHistory()" aria-label="Wyszukaj w historii">
+    </div>
+    <div class="filter-chips" id="history-chips"></div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Czas</th><th>Akcja</th><th>Produkt</th><th>Zmiana</th><th>Opis</th>
+          </tr></thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-danger btn-sm" onclick="clearHistory()" aria-label="Wyczyść całą historię zmian">🗑 Wyczyść historię</button>
+    </div>
+  </div>
+
 </main>
 
 <!-- MODAL: dodaj wyjazd -->
@@ -928,7 +958,11 @@ const countryData = {
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (!data.history) data.history = [];
+      return data;
+    }
   } catch(e) {}
   return getDefaultData();
 }
@@ -960,7 +994,8 @@ function getDefaultData() {
       { id: 'R002', name: 'Magyar Rallye', country: 'hu', date: addDays(52), duration: 5, notes: '' },
       { id: 'R003', name: 'Rally de España', country: 'es', date: addDays(94), duration: 7, notes: '' },
     ],
-    settings: { teamName: 'Zespół Rajdowy' }
+    settings: { teamName: 'Zespół Rajdowy' },
+    history: []
   };
 }
 
@@ -979,6 +1014,7 @@ function showView(v) {
   if (v === 'inventory') renderInventory();
   if (v === 'calendar') renderCalendar();
   if (v === 'scanner') stopScanner();
+  if (v === 'history') renderHistory();
 }
 
 // ========================
@@ -1136,7 +1172,14 @@ function renderDashboard() {
 
 function quickAdd(id) {
   const p = db.products.find(x => x.id === id);
-  if (p) { p.qty++; saveData(); renderDashboard(); toast(`Dodano 1 × ${p.name}`, 'success'); }
+  if (p) {
+    const before = p.qty;
+    p.qty++;
+    saveData();
+    logHistory('qty_change', { productId: p.id, productName: p.name, delta: 1, qtyBefore: before, qtyAfter: p.qty, note: 'Szybkie +1 (dashboard)' });
+    renderDashboard();
+    toast(`Dodano 1 × ${p.name}`, 'success');
+  }
 }
 
 // ========================
@@ -1197,16 +1240,20 @@ function setFilter(f) { activeFilter = f; renderInventory(); }
 function changeQty(id, delta) {
   const p = db.products.find(x => x.id === id);
   if (!p) return;
+  const before = p.qty;
   p.qty = Math.max(0, p.qty + delta);
   saveData();
+  logHistory('qty_change', { productId: p.id, productName: p.name, delta: p.qty - before, qtyBefore: before, qtyAfter: p.qty, note: 'Zmiana ręczna' });
   renderInventory();
   if (p.qty < p.min) toast(`⚠ ${p.name}: stan poniżej minimum!`, 'warning');
 }
 
 function deleteProduct(id) {
   if (!confirm('Usunąć produkt?')) return;
-  db.products = db.products.filter(p => p.id !== id);
+  const p = db.products.find(x => x.id === id);
+  db.products = db.products.filter(x => x.id !== id);
   saveData();
+  if (p) logHistory('delete_product', { productId: p.id, productName: p.name, note: 'Usunięto produkt' });
   renderInventory();
   toast('Produkt usunięty', 'error');
 }
@@ -1244,8 +1291,10 @@ function addProduct() {
 
   if (!name || !cat) { toast('Podaj nazwę i kategorię!', 'error'); return; }
 
-  db.products.push({ id: genId('PROD'), code, name, cat, qty, min, unit, expiry, location, notes });
+  const newProduct = { id: genId('PROD'), code, name, cat, qty, min, unit, expiry, location, notes };
+  db.products.push(newProduct);
   saveData();
+  logHistory('add_product', { productId: newProduct.id, productName: name, qtyAfter: qty, note: 'Dodano produkt' });
   clearAddForm();
   toast(`✅ Dodano: ${name}`, 'success');
   showView('inventory');
@@ -1349,8 +1398,10 @@ function scanQtyChange(d) {
 
 function scanAddStock() {
   if (!scannedProduct) return;
+  const before = scannedProduct.qty;
   scannedProduct.qty += scanQty;
   saveData();
+  logHistory('qty_change', { productId: scannedProduct.id, productName: scannedProduct.name, delta: scanQty, qtyBefore: before, qtyAfter: scannedProduct.qty, note: 'Skaner' });
   toast(`✅ Dodano ${scanQty} × ${scannedProduct.name}. Stan: ${scannedProduct.qty}`, 'success');
   document.getElementById('scan-product-card').style.display = 'none';
   document.getElementById('scan-result-box').style.display = 'none';
@@ -1358,8 +1409,10 @@ function scanAddStock() {
 
 function scanRemoveStock() {
   if (!scannedProduct) return;
+  const before = scannedProduct.qty;
   scannedProduct.qty = Math.max(0, scannedProduct.qty - scanQty);
   saveData();
+  logHistory('qty_change', { productId: scannedProduct.id, productName: scannedProduct.name, delta: scannedProduct.qty - before, qtyBefore: before, qtyAfter: scannedProduct.qty, note: 'Skaner' });
   toast(`➖ Zdjęto ${scanQty} × ${scannedProduct.name}. Stan: ${scannedProduct.qty}`, 'warning');
   if (scannedProduct.qty < scannedProduct.min) toast(`⚠ ${scannedProduct.name} poniżej minimum!`, 'warning');
   document.getElementById('scan-product-card').style.display = 'none';
@@ -1450,8 +1503,10 @@ function addRally() {
 
   if (!name || !date) { toast('Podaj nazwę i datę!', 'error'); return; }
 
-  db.rallies.push({ id: genId('R'), name, country, date, duration, notes });
+  const newRally = { id: genId('R'), name, country, date, duration, notes };
+  db.rallies.push(newRally);
   saveData();
+  logHistory('add_rally', { note: `Dodano wyjazd: ${name} (${date})` });
   closeModal('modal-rally');
   renderCalendar();
   toast(`✅ Dodano: ${name}`, 'success');
@@ -1461,8 +1516,10 @@ function addRally() {
 
 function deleteRally(id) {
   if (!confirm('Usunąć wyjazd?')) return;
-  db.rallies = db.rallies.filter(r => r.id !== id);
+  const r = db.rallies.find(x => x.id === id);
+  db.rallies = db.rallies.filter(x => x.id !== id);
   saveData();
+  if (r) logHistory('delete_rally', { note: `Usunięto wyjazd: ${r.name}` });
   renderCalendar();
   toast('Wyjazd usunięty', 'error');
 }
@@ -1508,7 +1565,9 @@ function importJSON() {
         const imported = JSON.parse(evt.target.result);
         if (imported.products && imported.rallies) {
           db = imported;
+          if (!db.history) db.history = [];
           saveData();
+          logHistory('import', { note: `Import backup JSON: ${imported.products.length} produktów, ${imported.rallies.length} wyjazdów` });
           renderDashboard();
           toast('✅ Backup wczytany pomyślnie', 'success');
         } else {
@@ -1527,6 +1586,126 @@ function downloadFile(content, filename, type) {
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ========================
+// HISTORY
+// ========================
+const HISTORY_MAX = 500;
+
+function logHistory(action, opts = {}) {
+  if (!db.history) db.history = [];
+  const entry = {
+    id: genId('H'),
+    timestamp: new Date().toISOString(),
+    action,
+    productId: opts.productId || null,
+    productName: opts.productName || null,
+    delta: opts.delta !== undefined ? opts.delta : null,
+    qtyBefore: opts.qtyBefore !== undefined ? opts.qtyBefore : null,
+    qtyAfter: opts.qtyAfter !== undefined ? opts.qtyAfter : null,
+    note: opts.note || ''
+  };
+  db.history.unshift(entry);
+  if (db.history.length > HISTORY_MAX) db.history.length = HISTORY_MAX;
+  saveData();
+}
+
+let historyFilter = 'all';
+
+function renderHistory() {
+  const chips = [
+    { key: 'all', label: 'Wszystko' },
+    { key: 'add_product', label: 'Dodania' },
+    { key: 'delete_product', label: 'Usunięcia' },
+    { key: 'qty_change', label: 'Zmiany stanu' },
+    { key: 'rally', label: 'Wyjazdy' },
+  ];
+
+  const chipsEl = document.getElementById('history-chips');
+  chipsEl.innerHTML = chips.map(c => `
+    <button class="chip ${historyFilter === c.key ? 'active' : ''}" onclick="setHistoryFilter('${c.key}')">
+      ${c.label}
+    </button>
+  `).join('');
+
+  const q = (document.getElementById('history-search')?.value || '').toLowerCase();
+  let entries = db.history || [];
+
+  if (historyFilter !== 'all') {
+    if (historyFilter === 'rally') {
+      entries = entries.filter(e => e.action === 'add_rally' || e.action === 'delete_rally');
+    } else {
+      entries = entries.filter(e => e.action === historyFilter);
+    }
+  }
+
+  if (q) {
+    entries = entries.filter(e =>
+      (e.productName || '').toLowerCase().includes(q) ||
+      (e.note || '').toLowerCase().includes(q)
+    );
+  }
+
+  const tbody = document.getElementById('history-tbody');
+
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Brak wpisów w historii</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const timeStr = new Date(e.timestamp).toLocaleString('pl-PL', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    const { icon, cls } = actionDisplay(e);
+
+    let deltaStr = '—';
+    if (e.delta !== null && e.delta !== undefined) {
+      const col = e.delta > 0 ? 'ok' : (e.delta < 0 ? 'warn' : 'text-dim');
+      deltaStr = `<span style="color:var(--${col})">${e.delta > 0 ? '+' : ''}${e.delta}</span>`;
+      if (e.qtyBefore !== null && e.qtyAfter !== null) {
+        deltaStr += `<br><span style="font-size:10px;color:var(--text-dim)">${e.qtyBefore} → ${e.qtyAfter}</span>`;
+      }
+    }
+
+    return `
+      <tr>
+        <td style="white-space:nowrap;font-size:12px;color:var(--text-dim)">${timeStr}</td>
+        <td><span class="history-action ${cls}">${icon}</span></td>
+        <td style="font-size:13px">${e.productName ? `<strong>${e.productName}</strong>` : '—'}</td>
+        <td>${deltaStr}</td>
+        <td style="font-size:12px;color:var(--text-dim)">${e.note || ''}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function actionDisplay(e) {
+  switch (e.action) {
+    case 'add_product':    return { icon: '✅', cls: 'hist-ok' };
+    case 'delete_product': return { icon: '🗑', cls: 'hist-danger' };
+    case 'qty_change':
+      if (e.delta > 0) return { icon: '➕', cls: 'hist-ok' };
+      if (e.delta < 0) return { icon: '➖', cls: 'hist-warn' };
+      return { icon: '↔', cls: '' };
+    case 'add_rally':    return { icon: '🏁', cls: 'hist-accent' };
+    case 'delete_rally': return { icon: '❌', cls: 'hist-danger' };
+    case 'import':       return { icon: '📥', cls: 'hist-blue' };
+    default:             return { icon: '•', cls: '' };
+  }
+}
+
+function setHistoryFilter(f) { historyFilter = f; renderHistory(); }
+
+function clearHistory() {
+  if (!confirm('Wyczyścić całą historię zmian?')) return;
+  db.history = [];
+  saveData();
+  renderHistory();
+  toast('Historia wyczyszczona', 'error');
 }
 
 // ========================
