@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rally Stock — Magazyn Rajdowy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0f0e;
+    --surface: #161a18;
+    --surface2: #1e2421;
+    --border: #2a3330;
+    --accent: #c8f53a;
+    --accent2: #ff4d2e;
+    --accent3: #3af5c8;
+    --text: #e8ede8;
+    --text-dim: #7a8f82;
+    --warn: #f5a623;
+    --danger: #ff4d2e;
+    --ok: #3af5c8;
+    --font-display: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-weight: 400;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent); }
+  .header-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: right;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  .nav-btn {
+    padding: 12px 20px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .nav-btn:hover:not(.active) { color: var(--text); }
+
+  /* MAIN */
+  main { padding: 20px; max-width: 900px; margin: 0 auto; }
+
+  /* VIEWS */
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-header {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  /* ALERT BANNERS */
+  .alerts-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .alert {
+    padding: 10px 14px;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 3px solid;
+  }
+  .alert.danger { background: rgba(255,77,46,.1); border-color: var(--danger); color: #ff8066; }
+  .alert.warn { background: rgba(245,166,35,.1); border-color: var(--warn); color: var(--warn); }
+  .alert.ok { background: rgba(58,245,200,.08); border-color: var(--ok); color: var(--ok); }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .stat-val.warn { color: var(--warn); }
+  .stat-val.danger { color: var(--danger); }
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* INVENTORY TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    font-family: var(--font-display);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 10px 10px; border-bottom: 1px solid rgba(42,51,48,.5); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .badge-food { background: rgba(58,245,200,.15); color: var(--ok); }
+  .badge-parts { background: rgba(200,245,58,.15); color: var(--accent); }
+  .badge-medical { background: rgba(255,77,46,.15); color: var(--danger); }
+  .badge-hygiene { background: rgba(245,166,35,.15); color: var(--warn); }
+  .badge-clothing { background: rgba(100,100,255,.15); color: #8080ff; }
+
+  .stock-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bar-bg {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 60px;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .3s;
+  }
+  .bar-ok { background: var(--ok); }
+  .bar-warn { background: var(--warn); }
+  .bar-danger { background: var(--danger); }
+
+  .qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .qty-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+  }
+  .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .qty-num {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .expiry { font-size: 11px; }
+  .expiry.ok { color: var(--ok); }
+  .expiry.warn { color: var(--warn); }
+  .expiry.danger { color: var(--danger); }
+
+  /* BUTTONS */
+  .btn {
+    padding: 10px 18px;
+    border-radius: 3px;
+    border: none;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #0d0f0e; }
+  .btn-primary:hover { background: #d4ff44; transform: translateY(-1px); }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(255,77,46,.15); color: var(--danger); border: 1px solid rgba(255,77,46,.3); }
+  .btn-danger:hover { background: rgba(255,77,46,.25); }
+  .btn-sm { padding: 6px 12px; font-size: 11px; }
+
+  /* FORM */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); }
+  input, select, textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  /* SCANNER */
+  .scanner-area {
+    position: relative;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  #scanner-video {
+    width: 100%;
+    max-height: 280px;
+    object-fit: cover;
+    display: block;
+  }
+  .scanner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .scan-frame {
+    width: 200px;
+    height: 200px;
+    border: 2px solid var(--accent);
+    border-radius: 4px;
+    position: relative;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.5);
+    animation: scanPulse 2s ease-in-out infinite;
+  }
+  @keyframes scanPulse {
+    0%, 100% { border-color: var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,.5), 0 0 20px rgba(200,245,58,.3); }
+    50% { border-color: var(--ok); box-shadow: 0 0 0 9999px rgba(0,0,0,.5), 0 0 30px rgba(58,245,200,.4); }
+  }
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scanMove 1.5s linear infinite;
+  }
+  @keyframes scanMove {
+    0% { top: 0; } 100% { top: 100%; }
+  }
+  .corner {
+    position: absolute;
+    width: 16px; height: 16px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  .corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
+  .corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+  .corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
+  .corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+  .scan-result {
+    padding: 14px;
+    background: rgba(58,245,200,.1);
+    border: 1px solid var(--ok);
+    border-radius: 3px;
+    font-size: 13px;
+    color: var(--ok);
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  /* CALENDAR */
+  .rally-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .rally-date-box {
+    min-width: 54px;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 6px;
+  }
+  .rally-day {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .rally-month {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .rally-info { flex: 1; }
+  .rally-name {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+  .rally-country {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rally-flag { font-size: 18px; }
+  .rally-checklist { font-size: 12px; color: var(--text-dim); }
+  .rally-days-left {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .rally-days-left.soon { background: rgba(255,77,46,.15); color: var(--danger); }
+  .rally-days-left.upcoming { background: rgba(245,166,35,.15); color: var(--warn); }
+  .rally-days-left.far { background: rgba(58,245,200,.1); color: var(--ok); }
+
+  /* COUNTRY TIPS */
+  .tips-box {
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 14px;
+    margin-top: 10px;
+  }
+  .tips-header {
+    font-family: var(--font-display);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tip-item {
+    font-size: 13px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(42,51,48,.5);
+    display: flex;
+    gap: 8px;
+  }
+  .tip-item:last-child { border-bottom: none; }
+  .tip-cat {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    min-width: 70px;
+    padding-top: 2px;
+  }
+
+  /* MODAL */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.8);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: fadeIn .2s ease;
+  }
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    color: var(--accent);
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  /* TOAST */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 13px;
+    min-width: 220px;
+    animation: slideIn .3s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  .toast.success { border-left-color: var(--ok); }
+  .toast.warning { border-left-color: var(--warn); }
+  .toast.error { border-left-color: var(--danger); }
+  @keyframes slideIn {
+    from { transform: translateX(110%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* SEARCH */
+  .search-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    align-items: center;
+  }
+  .search-bar input { flex: 1; }
+
+  /* FILTER CHIPS */
+  .filter-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .chip {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    transition: all .15s;
+  }
+  .chip.active, .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(200,245,58,.08); }
+
+  /* EXPORT */
+  .export-section {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    main { padding: 12px; }
+    .rally-card { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" onclick="showView('dashboard')" style="cursor:pointer" title="Strona główna">Rally<span>Stock</span></div>
+  <div class="header-meta">
+    <div id="team-name">Zespół Rajdowy</div>
+    <div id="current-date"></div>
+  </div>
+</header>
+
+<nav>
+  <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">⚡ Dashboard</button>
+  <button class="nav-btn" onclick="showView('inventory')" data-view="inventory">📦 Magazyn</button>
+  <button class="nav-btn" onclick="showView('scanner')" data-view="scanner">📷 Skaner</button>
+  <button class="nav-btn" onclick="showView('calendar')" data-view="calendar">🗓 Kalendarz</button>
+  <button class="nav-btn" onclick="showView('add')" data-view="add">➕ Dodaj</button>
+  <button class="nav-btn" onclick="showView('export')" data-view="export">⬇ Export</button>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <div class="view active" id="view-dashboard">
+    <div id="alerts-bar" class="alerts-bar"></div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="card">
+      <div class="card-header">Następny wyjazd</div>
+      <div id="next-rally-widget"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Krytyczne stany magazynowe</div>
+      <div class="table-wrap">
+        <table id="critical-table">
+          <thead><tr>
+            <th>Produkt</th><th>Stan</th><th>Min</th><th>Kategoria</th><th>Akcja</th>
+          </tr></thead>
+          <tbody id="critical-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="view" id="view-inventory">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Szukaj produktu, kodu..." oninput="renderInventory()">
+      <button class="btn btn-outline btn-sm" onclick="showView('add')">➕ Nowy</button>
+    </div>
+    <div class="filter-chips" id="filter-chips"></div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Produkt</th><th>Kategoria</th><th>Stan</th><th>Termin</th><th>Akcja</th>
+          </tr></thead>
+          <tbody id="inventory-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCANNER -->
+  <div class="view" id="view-scanner">
+    <div class="card">
+      <div class="card-header">Skaner QR / Kod kreskowy</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:14px">Nakieruj kamerę na kod QR lub kod EAN produktu. Skaner automatycznie rozpozna produkt i pozwoli zaktualizować stan.</p>
+
+      <div class="scanner-area" id="scanner-area" style="display:none">
+        <video id="scanner-video" playsinline autoplay muted></video>
+        <canvas id="scanner-canvas" style="display:none"></canvas>
+        <div class="scanner-overlay">
+          <div class="scan-frame">
+            <div class="scan-line"></div>
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="scan-result-box" class="scan-result"></div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="start-scan-btn" onclick="startScanner()">📷 Uruchom kamerę</button>
+        <button class="btn btn-outline" id="stop-scan-btn" onclick="stopScanner()" style="display:none">⏹ Zatrzymaj</button>
+        <button class="btn btn-outline" onclick="openManualScan()">⌨ Wpisz kod ręcznie</button>
+      </div>
+    </div>
+
+    <div class="card" id="scan-product-card" style="display:none">
+      <div class="card-header">Znaleziony produkt</div>
+      <div id="scan-product-info"></div>
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="scanQtyChange(-1)">−</button>
+          <span class="qty-num" id="scan-qty-num">1</span>
+          <button class="qty-btn" onclick="scanQtyChange(1)">+</button>
+        </div>
+        <button class="btn btn-primary" onclick="scanAddStock()">➕ Dodaj do stanu</button>
+        <button class="btn btn-danger btn-sm" onclick="scanRemoveStock()">➖ Zdejmij ze stanu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div class="view" id="view-calendar">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:2px;text-transform:uppercase">Kalendarz Rajdowy</h2>
+      <button class="btn btn-primary btn-sm" onclick="openAddRally()">+ Dodaj wyjazd</button>
+    </div>
+    <div id="rally-list"></div>
+  </div>
+
+  <!-- ADD PRODUCT -->
+  <div class="view" id="view-add">
+    <div class="card">
+      <div class="card-header">Nowy produkt / towar</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nazwa produktu *</label>
+          <input type="text" id="add-name" placeholder="np. Woda mineralna 1,5L">
+        </div>
+        <div class="form-group">
+          <label>Kategoria *</label>
+          <select id="add-cat">
+            <option value="">Wybierz...</option>
+            <option value="food">Żywność / Napoje</option>
+            <option value="parts">Części zamienne</option>
+            <option value="medical">Medyczne / Leki</option>
+            <option value="hygiene">Środki czystości</option>
+            <option value="clothing">Odzież rajdowa</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Stan aktualny *</label>
+          <input type="number" id="add-qty" placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Stan minimalny (alert)</label>
+          <input type="number" id="add-min" placeholder="np. 5" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Jednostka</label>
+          <select id="add-unit">
+            <option value="szt">szt</option>
+            <option value="kg">kg</option>
+            <option value="L">L</option>
+            <option value="opak">opak</option>
+            <option value="para">para</option>
+            <option value="komplet">komplet</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Termin ważności</label>
+          <input type="date" id="add-expiry">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Kod QR / EAN (opcjonalnie)</label>
+          <input type="text" id="add-code" placeholder="np. 5900123456789">
+        </div>
+        <div class="form-group">
+          <label>Lokalizacja w magazynie</label>
+          <input type="text" id="add-location" placeholder="np. Skrzynka A3">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div class="form-group">
+          <label>Notatki</label>
+          <textarea id="add-notes" rows="2" placeholder="Dodatkowe informacje..."></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="addProduct()">💾 Zapisz produkt</button>
+        <button class="btn btn-outline" onclick="clearAddForm()">✕ Wyczyść</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="view" id="view-export">
+    <div class="card">
+      <div class="card-header">Eksport danych</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px">Eksportuj dane magazynowe do pliku CSV który możesz otworzyć w Excelu.</p>
+      <div class="export-section">
+        <button class="btn btn-primary" onclick="exportCSV('all')">⬇ Eksport pełny (CSV)</button>
+        <button class="btn btn-outline" onclick="exportCSV('low')">⚠ Tylko braki</button>
+        <button class="btn btn-outline" onclick="exportCSV('expiry')">📅 Kończące ważność</button>
+        <button class="btn btn-outline" onclick="exportJSON()">{ } Backup JSON</button>
+        <button class="btn btn-danger btn-sm" onclick="importJSON()">⬆ Wczytaj backup</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Instrukcja — Excel + skanowanie</div>
+      <div style="font-size:13px;line-height:1.7;color:var(--text-dim)">
+        <p style="margin-bottom:10px"><strong style="color:var(--text)">1. Etykieciarka (własne kody QR)</strong><br>
+        Gdy dodajesz produkt, wpisz unikalny kod (np. <code style="background:var(--surface2);padding:1px 5px;border-radius:2px">RALLY-001</code>) w polu "Kod QR/EAN". Zaprogramuj etykieciarkę żeby drukowała ten kod.</p>
+        <p style="margin-bottom:10px"><strong style="color:var(--text)">2. Produkty ze sklepu (kody EAN)</strong><br>
+        Zeskanuj istniejący kod kreskowy z pudełka w zakładce Skaner — system automatycznie znajdzie produkt w magazynie.</p>
+        <p style="margin-bottom:10px"><strong style="color:var(--text)">3. Synchronizacja z Excelem</strong><br>
+        Użyj "Eksport pełny (CSV)" → otwórz w Excelu → Dane → Odśwież. Możesz też skonfigurować Power Query do automatycznego odświeżania.</p>
+        <p><strong style="color:var(--text)">4. Praca offline</strong><br>
+        Aplikacja działa lokalnie w przeglądarce. Dane są zapisywane w pamięci telefonu (localStorage). Regularnie rób backup JSON.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- MODAL: dodaj wyjazd -->
+<div class="modal-bg" id="modal-rally">
+  <div class="modal">
+    <div class="modal-title">Nowy wyjazd</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nazwa rajdu *</label>
+        <input type="text" id="r-name" placeholder="np. Rally du Maroc">
+      </div>
+      <div class="form-group">
+        <label>Kraj</label>
+        <select id="r-country">
+          <option value="ma">🇲🇦 Maroko</option>
+          <option value="hu">🇭🇺 Węgry</option>
+          <option value="es">🇪🇸 Hiszpania</option>
+          <option value="pt">🇵🇹 Portugalia</option>
+          <option value="it">🇮🇹 Włochy</option>
+          <option value="fr">🇫🇷 Francja</option>
+          <option value="de">🇩🇪 Niemcy</option>
+          <option value="pl">🇵🇱 Polska</option>
+          <option value="gr">🇬🇷 Grecja</option>
+          <option value="tn">🇹🇳 Tunezja</option>
+          <option value="other">🌍 Inny</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Data wyjazdu *</label>
+        <input type="date" id="r-date">
+      </div>
+      <div class="form-group">
+        <label>Czas trwania (dni)</label>
+        <input type="number" id="r-duration" placeholder="7" min="1">
+      </div>
+    </div>
+    <div class="form-row full">
+      <div class="form-group">
+        <label>Notatki</label>
+        <textarea id="r-notes" rows="2" placeholder="Trasa, wymagania specjalne..."></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-rally')">Anuluj</button>
+      <button class="btn btn-primary" onclick="addRally()">Zapisz wyjazd</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ręczny kod -->
+<div class="modal-bg" id="modal-manual">
+  <div class="modal">
+    <div class="modal-title">Wpisz kod ręcznie</div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Kod QR / EAN</label>
+      <input type="text" id="manual-code-input" placeholder="np. RALLY-001 lub 5900123456789">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modal-manual')">Anuluj</button>
+      <button class="btn btn-primary" onclick="processManualCode()">Szukaj</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ========================
+// DATA STORE
+// ========================
+const STORAGE_KEY = 'rally_stock_v2';
+
+const countryData = {
+  ma: {
+    name: 'Maroko', flag: '🇲🇦',
+    tips: [
+      { cat: 'Medyczne', text: 'Szczepionki: tężec, WZW A/B, zalecane. Leki przeciw biegunce obowiązkowe.' },
+      { cat: 'Żywność', text: 'Woda tylko butelkowana. Zapas min. 5L/osoba/dzień w terenie.' },
+      { cat: 'Klimat', text: 'Upały do 45°C. Elektrolity, krem SPF 50+, chłodnica auta.' },
+      { cat: 'Przepisy', text: 'Ubezpieczenie OC ważne w Maroku. Kamizelki odblaskowe wymagane.' },
+      { cat: 'Odzież', text: 'Nakrycia głowy, chusty, ubrania zasłaniające ramiona.' },
+      { cat: 'Apteczka', text: 'Środki do odkażania ran, maść na oparzenia słoneczne.' },
+    ]
+  },
+  hu: {
+    name: 'Węgry', flag: '🇭🇺',
+    tips: [
+      { cat: 'Przepisy', text: 'Winietka autostradowa obowiązkowa. Alkohol 0‰ dla kierowcy.' },
+      { cat: 'Medyczne', text: 'EKUZ wystarczy. Standardowa apteczka.' },
+      { cat: 'Klimat', text: 'Lato: upały do 38°C. Zima: możliwy śnieg i lód.' },
+      { cat: 'Żywność', text: 'Pełna dostępność. Warto zabrać ulubione przekąski.' },
+    ]
+  },
+  es: {
+    name: 'Hiszpania', flag: '🇪🇸',
+    tips: [
+      { cat: 'Przepisy', text: 'Dwie kamizelki odblaskowe w aucie, trójkąty. Okulary zapasowe jeśli na recepcie.' },
+      { cat: 'Klimat', text: 'Południe: bardzo gorąco. Zima na północy: deszcz i zimno.' },
+      { cat: 'Medyczne', text: 'EKUZ akceptowany. Sprawdź apteki lokalne.' },
+    ]
+  },
+  pt: { name: 'Portugalia', flag: '🇵🇹', tips: [
+    { cat: 'Przepisy', text: 'Kamizelki odblaskowe dla wszystkich pasażerów.' },
+    { cat: 'Klimat', text: 'Atlantyk: wilgoć, mgły poranne. Alentejo: upały.' },
+  ]},
+  it: { name: 'Włochy', flag: '🇮🇹', tips: [
+    { cat: 'Przepisy', text: 'ZTL (strefy ograniczonego ruchu) w miastach — uważaj na mandaty.' },
+    { cat: 'Medyczne', text: 'EKUZ akceptowany.' },
+  ]},
+  fr: { name: 'Francja', flag: '🇫🇷', tips: [
+    { cat: 'Przepisy', text: 'Breathalyzer jednorazowy obowiązkowy. Kamizelki.' },
+    { cat: 'Żywność', text: 'Dobra dostępność. Niedziele — sklepy często zamknięte.' },
+  ]},
+  tn: { name: 'Tunezja', flag: '🇹🇳', tips: [
+    { cat: 'Medyczne', text: 'Szczepionki jak przy Maroku. Woda butelkowana.' },
+    { cat: 'Klimat', text: 'Sahara: ekstremalne upały. Zapas wody krytyczny.' },
+    { cat: 'Przepisy', text: 'Carnet de passage wymagane dla pojazdu.' },
+  ]},
+  de: { name: 'Niemcy', flag: '🇩🇪', tips: [{ cat: 'Przepisy', text: 'Autostrada bezpłatna. Apteczka obowiązkowa.' }]},
+  pl: { name: 'Polska', flag: '🇵🇱', tips: [{ cat: 'Ogólne', text: 'Tryb domowy — standardowe wyposażenie.' }]},
+  gr: { name: 'Grecja', flag: '🇬🇷', tips: [
+    { cat: 'Klimat', text: 'Wysoka temperatura, sucho. Pożary lasów latem.' },
+    { cat: 'Medyczne', text: 'EKUZ. Leki na ukąszenia owadów.' },
+  ]},
+  other: { name: 'Inny kraj', flag: '🌍', tips: [] }
+};
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return getDefaultData();
+}
+
+function saveData() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch(e) {}
+}
+
+function getDefaultData() {
+  const today = new Date();
+  const fmt = (d) => d.toISOString().split('T')[0];
+  const addDays = (n) => { const d = new Date(today); d.setDate(d.getDate()+n); return fmt(d); };
+
+  return {
+    products: [
+      { id: 'P001', code: 'RALLY-001', name: 'Woda mineralna 1,5L', cat: 'food', qty: 48, min: 24, unit: 'szt', expiry: addDays(180), location: 'Skrzynka A1', notes: '' },
+      { id: 'P002', code: 'RALLY-002', name: 'Batony energetyczne', cat: 'food', qty: 3, min: 20, unit: 'szt', expiry: addDays(60), location: 'Skrzynka A2', notes: '' },
+      { id: 'P003', code: '5900123456789', name: 'Olej silnikowy 5W40', cat: 'parts', qty: 6, min: 4, unit: 'L', expiry: '', location: 'Regał B1', notes: '4 litry na pełną wymianę' },
+      { id: 'P004', code: 'RALLY-004', name: 'Apteczka pierwszej pomocy', cat: 'medical', qty: 2, min: 2, unit: 'komplet', expiry: addDays(12), location: 'Kabina', notes: 'Sprawdzić daty leków' },
+      { id: 'P005', code: 'RALLY-005', name: 'Rękawice robocze', cat: 'clothing', qty: 8, min: 4, unit: 'para', expiry: '', location: 'Szuflada C1', notes: '' },
+      { id: 'P006', code: 'RALLY-006', name: 'Środek do dezynfekcji rąk', cat: 'hygiene', qty: 2, min: 5, unit: 'szt', expiry: addDays(300), location: 'Skrzynka D1', notes: '' },
+      { id: 'P007', code: 'RALLY-007', name: 'Pasta do zębów', cat: 'hygiene', qty: 12, min: 4, unit: 'szt', expiry: addDays(400), location: 'Skrzynka D2', notes: '' },
+      { id: 'P008', code: 'RALLY-008', name: 'Ibuprofen 200mg', cat: 'medical', qty: 30, min: 20, unit: 'szt', expiry: addDays(8), location: 'Apteczka', notes: '' },
+      { id: 'P009', code: 'RALLY-009', name: 'Zapasowe żarówki H4', cat: 'parts', qty: 4, min: 2, unit: 'szt', expiry: '', location: 'Regał B2', notes: '' },
+      { id: 'P010', code: 'RALLY-010', name: 'Kamizelki odblaskowe', cat: 'clothing', qty: 5, min: 5, unit: 'szt', expiry: '', location: 'Kabina', notes: 'Obowiązkowe w wielu krajach' },
+    ],
+    rallies: [
+      { id: 'R001', name: 'Rally du Maroc', country: 'ma', date: addDays(18), duration: 10, notes: 'Etap główny sezonu' },
+      { id: 'R002', name: 'Magyar Rallye', country: 'hu', date: addDays(52), duration: 5, notes: '' },
+      { id: 'R003', name: 'Rally de España', country: 'es', date: addDays(94), duration: 7, notes: '' },
+    ],
+    settings: { teamName: 'Zespół Rajdowy' }
+  };
+}
+
+let db = loadData();
+
+// ========================
+// NAVIGATION
+// ========================
+function showView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelector(`[data-view="${v}"]`).classList.add('active');
+
+  if (v === 'dashboard') renderDashboard();
+  if (v === 'inventory') renderInventory();
+  if (v === 'calendar') renderCalendar();
+  if (v === 'scanner') stopScanner();
+}
+
+// ========================
+// UTILS
+// ========================
+function genId(prefix) {
+  return prefix + Date.now().toString(36).toUpperCase();
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return Math.round((d - now) / 86400000);
+}
+
+function expiryClass(dateStr) {
+  const d = daysUntil(dateStr);
+  if (d === null) return '';
+  if (d < 0) return 'danger';
+  if (d <= 14) return 'danger';
+  if (d <= 45) return 'warn';
+  return 'ok';
+}
+
+function expiryLabel(dateStr) {
+  const d = daysUntil(dateStr);
+  if (d === null) return '—';
+  if (d < 0) return `WYGASŁO ${Math.abs(d)}d temu`;
+  if (d === 0) return 'DZIŚ';
+  if (d === 1) return 'JUTRO';
+  return `${d}d`;
+}
+
+function stockClass(qty, min) {
+  if (qty === 0) return 'danger';
+  if (qty < min) return 'danger';
+  if (qty < min * 1.5) return 'warn';
+  return 'ok';
+}
+
+function stockPct(qty, min) {
+  if (!min || min === 0) return 100;
+  return Math.min(100, Math.round((qty / (min * 3)) * 100));
+}
+
+const catLabels = { food:'Żywność', parts:'Części', medical:'Medyczne', hygiene:'Higiena', clothing:'Odzież' };
+const catBadge = { food:'badge-food', parts:'badge-parts', medical:'badge-medical', hygiene:'badge-hygiene', clothing:'badge-clothing' };
+
+function toast(msg, type = 'default') {
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ========================
+// DASHBOARD
+// ========================
+function renderDashboard() {
+  document.getElementById('current-date').textContent = new Date().toLocaleDateString('pl-PL', {weekday:'short',day:'numeric',month:'long'});
+  document.getElementById('team-name').textContent = db.settings.teamName;
+
+  // alerts
+  const alertsEl = document.getElementById('alerts-bar');
+  alertsEl.innerHTML = '';
+  const alerts = [];
+
+  db.products.forEach(p => {
+    if (p.qty < p.min) alerts.push({ type: p.qty === 0 ? 'danger' : 'danger', msg: `⚠ BRAK / MAŁO: ${p.name} — ${p.qty} ${p.unit} (min. ${p.min})` });
+    if (p.expiry) {
+      const d = daysUntil(p.expiry);
+      if (d !== null && d < 0) alerts.push({ type: 'danger', msg: `❌ WYGASŁO: ${p.name} (${Math.abs(d)} dni temu)` });
+      else if (d !== null && d <= 14) alerts.push({ type: 'danger', msg: `⏰ Termin ważności za ${d}d: ${p.name}` });
+      else if (d !== null && d <= 45) alerts.push({ type: 'warn', msg: `📅 Termin ważności za ${d}d: ${p.name}` });
+    }
+  });
+
+  const nextRally = getNextRally();
+  if (nextRally) {
+    const d = daysUntil(nextRally.date);
+    if (d <= 7) alerts.push({ type: 'danger', msg: `🏁 UWAGA: ${nextRally.name} za ${d} dni! Sprawdź zapasy!` });
+    else if (d <= 21) alerts.push({ type: 'warn', msg: `🏁 ${nextRally.name} za ${d} dni — czas uzupełnić braki.` });
+  }
+
+  if (alerts.length === 0) {
+    alertsEl.innerHTML = '<div class="alert ok">✅ Wszystkie stany w normie. Magazyn gotowy.</div>';
+  } else {
+    alerts.slice(0,5).forEach(a => {
+      alertsEl.innerHTML += `<div class="alert ${a.type}">${a.msg}</div>`;
+    });
+  }
+
+  // stats
+  const low = db.products.filter(p => p.qty < p.min).length;
+  const expired = db.products.filter(p => p.expiry && daysUntil(p.expiry) !== null && daysUntil(p.expiry) <= 14).length;
+  const statsEl = document.getElementById('stats-row');
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-val">${db.products.length}</div><div class="stat-label">Produkty</div></div>
+    <div class="stat"><div class="stat-val ${low > 0 ? 'danger' : ''}">${low}</div><div class="stat-label">Braki</div></div>
+    <div class="stat"><div class="stat-val ${expired > 0 ? 'warn' : ''}">${expired}</div><div class="stat-label">Expiry wkrótce</div></div>
+    <div class="stat"><div class="stat-val">${db.rallies.filter(r=>daysUntil(r.date) >= 0).length}</div><div class="stat-label">Wyjazdów</div></div>
+  `;
+
+  // next rally widget
+  const nrEl = document.getElementById('next-rally-widget');
+  if (nextRally) {
+    const cd = countryData[nextRally.country] || countryData.other;
+    const d = daysUntil(nextRally.date);
+    const cls = d <= 7 ? 'soon' : d <= 21 ? 'upcoming' : 'far';
+    nrEl.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:var(--font-display);font-size:22px;font-weight:800">${cd.flag} ${nextRally.name}</div>
+          <div style="color:var(--text-dim);font-size:13px;margin-top:2px">${nextRally.date} · ${nextRally.duration} dni</div>
+        </div>
+        <div class="rally-days-left ${cls}">Za ${d} dni</div>
+      </div>
+      ${cd.tips.length > 0 ? `
+      <div class="tips-box" style="margin-top:14px">
+        <div class="tips-header">💡 Wskazówki — ${cd.name}</div>
+        ${cd.tips.slice(0,3).map(t=>`<div class="tip-item"><span class="tip-cat">${t.cat}</span><span>${t.text}</span></div>`).join('')}
+      </div>` : ''}
+    `;
+  } else {
+    nrEl.innerHTML = '<div style="color:var(--text-dim);font-size:13px">Brak zaplanowanych wyjazdów. <span style="color:var(--accent);cursor:pointer" onclick="showView(\'calendar\')">Dodaj wyjazd →</span></div>';
+  }
+
+  // critical table
+  const crit = db.products.filter(p => p.qty < p.min || (p.expiry && daysUntil(p.expiry) !== null && daysUntil(p.expiry) <= 30));
+  const tbody = document.getElementById('critical-tbody');
+  if (crit.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Brak krytycznych pozycji ✓</td></tr>';
+  } else {
+    tbody.innerHTML = crit.map(p => `
+      <tr>
+        <td><strong>${p.name}</strong></td>
+        <td>
+          <div class="stock-bar">
+            <div class="bar-bg"><div class="bar-fill bar-${stockClass(p.qty,p.min)}" style="width:${stockPct(p.qty,p.min)}%"></div></div>
+            <span style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--${stockClass(p.qty,p.min)==='ok'?'ok':stockClass(p.qty,p.min)==='warn'?'warn':'danger'})">${p.qty} ${p.unit}</span>
+          </div>
+        </td>
+        <td style="color:var(--text-dim)">${p.min} ${p.unit}</td>
+        <td><span class="badge ${catBadge[p.cat]}">${catLabels[p.cat]}</span></td>
+        <td><button class="btn btn-primary btn-sm" onclick="quickAdd('${p.id}')">+1</button></td>
+      </tr>
+    `).join('');
+  }
+}
+
+function quickAdd(id) {
+  const p = db.products.find(x => x.id === id);
+  if (p) { p.qty++; saveData(); renderDashboard(); toast(`Dodano 1 × ${p.name}`, 'success'); }
+}
+
+// ========================
+// INVENTORY
+// ========================
+let activeFilter = 'all';
+
+function renderInventory() {
+  // chips
+  const cats = ['all', ...new Set(db.products.map(p => p.cat))];
+  const chipsEl = document.getElementById('filter-chips');
+  chipsEl.innerHTML = cats.map(c => `
+    <button class="chip ${activeFilter === c ? 'active' : ''}" onclick="setFilter('${c}')">
+      ${c === 'all' ? 'Wszystko' : catLabels[c] || c}
+    </button>
+  `).join('');
+
+  const q = document.getElementById('search-input').value.toLowerCase();
+  let products = db.products;
+  if (activeFilter !== 'all') products = products.filter(p => p.cat === activeFilter);
+  if (q) products = products.filter(p =>
+    p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.location||'').toLowerCase().includes(q)
+  );
+
+  const tbody = document.getElementById('inventory-tbody');
+  tbody.innerHTML = products.map(p => {
+    const sc = stockClass(p.qty, p.min);
+    const ec = p.expiry ? expiryClass(p.expiry) : '';
+    return `
+      <tr>
+        <td>
+          <div><strong>${p.name}</strong></div>
+          <div style="font-size:11px;color:var(--text-dim)">${p.code} · ${p.location || ''}</div>
+        </td>
+        <td><span class="badge ${catBadge[p.cat]}">${catLabels[p.cat]}</span></td>
+        <td>
+          <div class="qty-controls">
+            <button class="qty-btn" onclick="changeQty('${p.id}',-1)">−</button>
+            <span class="qty-num" style="color:var(--${sc==='ok'?'ok':sc==='warn'?'warn':'danger'})">${p.qty}</span>
+            <button class="qty-btn" onclick="changeQty('${p.id}',1)">+</button>
+          </div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${p.unit} · min ${p.min}</div>
+        </td>
+        <td>
+          ${p.expiry ? `<span class="expiry ${ec}">${expiryLabel(p.expiry)}</span><br><span style="font-size:10px;color:var(--text-dim)">${p.expiry}</span>` : '—'}
+        </td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editProduct('${p.id}')">✏</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">🗑</button>
+        </td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Brak produktów</td></tr>';
+}
+
+function setFilter(f) { activeFilter = f; renderInventory(); }
+
+function changeQty(id, delta) {
+  const p = db.products.find(x => x.id === id);
+  if (!p) return;
+  p.qty = Math.max(0, p.qty + delta);
+  saveData();
+  renderInventory();
+  if (p.qty < p.min) toast(`⚠ ${p.name}: stan poniżej minimum!`, 'warning');
+}
+
+function deleteProduct(id) {
+  if (!confirm('Usunąć produkt?')) return;
+  db.products = db.products.filter(p => p.id !== id);
+  saveData();
+  renderInventory();
+  toast('Produkt usunięty', 'error');
+}
+
+function editProduct(id) {
+  const p = db.products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('add-name').value = p.name;
+  document.getElementById('add-cat').value = p.cat;
+  document.getElementById('add-qty').value = p.qty;
+  document.getElementById('add-min').value = p.min;
+  document.getElementById('add-unit').value = p.unit;
+  document.getElementById('add-expiry').value = p.expiry || '';
+  document.getElementById('add-code').value = p.code;
+  document.getElementById('add-location').value = p.location || '';
+  document.getElementById('add-notes').value = p.notes || '';
+  db.products = db.products.filter(x => x.id !== id);
+  showView('add');
+  toast('Edytuj produkt i zapisz', 'default');
+}
+
+// ========================
+// ADD PRODUCT
+// ========================
+function addProduct() {
+  const name = document.getElementById('add-name').value.trim();
+  const cat = document.getElementById('add-cat').value;
+  const qty = parseInt(document.getElementById('add-qty').value) || 0;
+  const min = parseInt(document.getElementById('add-min').value) || 0;
+  const unit = document.getElementById('add-unit').value;
+  const expiry = document.getElementById('add-expiry').value;
+  const code = document.getElementById('add-code').value.trim() || genId('P');
+  const location = document.getElementById('add-location').value.trim();
+  const notes = document.getElementById('add-notes').value.trim();
+
+  if (!name || !cat) { toast('Podaj nazwę i kategorię!', 'error'); return; }
+
+  db.products.push({ id: genId('PROD'), code, name, cat, qty, min, unit, expiry, location, notes });
+  saveData();
+  clearAddForm();
+  toast(`✅ Dodano: ${name}`, 'success');
+  showView('inventory');
+}
+
+function clearAddForm() {
+  ['add-name','add-qty','add-min','add-expiry','add-code','add-location','add-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('add-cat').value = '';
+  document.getElementById('add-unit').value = 'szt';
+}
+
+// ========================
+// SCANNER
+// ========================
+let stream = null;
+let scanInterval = null;
+let scannedProduct = null;
+let scanQty = 1;
+
+function startScanner() {
+  if (!navigator.mediaDevices) { toast('Kamera niedostępna w tej przeglądarce', 'error'); return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(s => {
+      stream = s;
+      const video = document.getElementById('scanner-video');
+      video.srcObject = s;
+      document.getElementById('scanner-area').style.display = 'block';
+      document.getElementById('start-scan-btn').style.display = 'none';
+      document.getElementById('stop-scan-btn').style.display = 'inline-flex';
+      document.getElementById('scan-product-card').style.display = 'none';
+      document.getElementById('scan-result-box').style.display = 'none';
+
+      scanInterval = setInterval(() => {
+        const canvas = document.getElementById('scanner-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        if (canvas.width === 0) return;
+        ctx.drawImage(video, 0, 0);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code) {
+          processCode(code.data);
+          clearInterval(scanInterval);
+          stopScanner();
+        }
+      }, 300);
+    })
+    .catch(() => toast('Brak dostępu do kamery. Sprawdź uprawnienia.', 'error'));
+}
+
+function stopScanner() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  document.getElementById('scanner-area').style.display = 'none';
+  document.getElementById('start-scan-btn').style.display = 'inline-flex';
+  document.getElementById('stop-scan-btn').style.display = 'none';
+}
+
+function processCode(code) {
+  const resultBox = document.getElementById('scan-result-box');
+  const productCard = document.getElementById('scan-product-card');
+  resultBox.style.display = 'block';
+  resultBox.textContent = `📷 Zeskanowano: ${code}`;
+
+  const product = db.products.find(p => p.code === code || p.id === code);
+  if (product) {
+    scannedProduct = product;
+    scanQty = 1;
+    document.getElementById('scan-qty-num').textContent = scanQty;
+    const sc = stockClass(product.qty, product.min);
+    document.getElementById('scan-product-info').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-family:var(--font-display);font-size:20px;font-weight:700">${product.name}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge ${catBadge[product.cat]}">${catLabels[product.cat]}</span>
+          <span style="font-size:13px;color:var(--${sc==='ok'?'ok':sc==='warn'?'warn':'danger'})">Stan: ${product.qty} ${product.unit}</span>
+        </div>
+        ${product.location ? `<div style="font-size:12px;color:var(--text-dim)">📍 ${product.location}</div>` : ''}
+      </div>
+    `;
+    productCard.style.display = 'block';
+    toast(`Znaleziono: ${product.name}`, 'success');
+  } else {
+    scannedProduct = null;
+    productCard.style.display = 'none';
+    resultBox.innerHTML = `📷 Zeskanowano: <strong>${code}</strong><br><span style="color:var(--warn)">Nie znaleziono w magazynie.</span>
+      <span style="color:var(--accent);cursor:pointer;margin-left:8px" onclick="prefillAdd('${code}')">→ Dodaj nowy produkt</span>`;
+  }
+}
+
+function prefillAdd(code) {
+  document.getElementById('add-code').value = code;
+  showView('add');
+}
+
+function scanQtyChange(d) {
+  scanQty = Math.max(1, scanQty + d);
+  document.getElementById('scan-qty-num').textContent = scanQty;
+}
+
+function scanAddStock() {
+  if (!scannedProduct) return;
+  scannedProduct.qty += scanQty;
+  saveData();
+  toast(`✅ Dodano ${scanQty} × ${scannedProduct.name}. Stan: ${scannedProduct.qty}`, 'success');
+  document.getElementById('scan-product-card').style.display = 'none';
+  document.getElementById('scan-result-box').style.display = 'none';
+}
+
+function scanRemoveStock() {
+  if (!scannedProduct) return;
+  scannedProduct.qty = Math.max(0, scannedProduct.qty - scanQty);
+  saveData();
+  toast(`➖ Zdjęto ${scanQty} × ${scannedProduct.name}. Stan: ${scannedProduct.qty}`, 'warning');
+  if (scannedProduct.qty < scannedProduct.min) toast(`⚠ ${scannedProduct.name} poniżej minimum!`, 'warning');
+  document.getElementById('scan-product-card').style.display = 'none';
+  document.getElementById('scan-result-box').style.display = 'none';
+}
+
+function openManualScan() { document.getElementById('modal-manual').classList.add('open'); }
+
+function processManualCode() {
+  const code = document.getElementById('manual-code-input').value.trim();
+  if (!code) return;
+  closeModal('modal-manual');
+  processCode(code);
+  document.getElementById('manual-code-input').value = '';
+}
+
+// ========================
+// CALENDAR
+// ========================
+function getNextRally() {
+  const upcoming = db.rallies
+    .filter(r => daysUntil(r.date) >= 0)
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+  return upcoming[0] || null;
+}
+
+function renderCalendar() {
+  const sorted = [...db.rallies].sort((a,b) => new Date(a.date) - new Date(b.date));
+  const el = document.getElementById('rally-list');
+
+  if (sorted.length === 0) {
+    el.innerHTML = '<div class="card" style="color:var(--text-dim);text-align:center;padding:30px">Brak zaplanowanych wyjazdów</div>';
+    return;
+  }
+
+  el.innerHTML = sorted.map(r => {
+    const cd = countryData[r.country] || countryData.other;
+    const d = daysUntil(r.date);
+    const cls = d < 0 ? 'far' : d <= 7 ? 'soon' : d <= 21 ? 'upcoming' : 'far';
+    const dateObj = new Date(r.date);
+    const day = dateObj.getDate();
+    const month = dateObj.toLocaleDateString('pl-PL', {month:'short'}).toUpperCase();
+
+    // Low stock for this rally
+    const lowItems = db.products.filter(p => p.qty < p.min);
+
+    return `
+      <div class="rally-card">
+        <div class="rally-date-box">
+          <div class="rally-day">${day}</div>
+          <div class="rally-month">${month}</div>
+        </div>
+        <div class="rally-info">
+          <div class="rally-name">${r.name}</div>
+          <div class="rally-country"><span class="rally-flag">${cd.flag}</span>${cd.name} · ${r.duration} dni</div>
+          ${r.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${r.notes}</div>` : ''}
+          ${lowItems.length > 0 ? `<div style="font-size:12px;color:var(--danger);margin-bottom:8px">⚠ ${lowItems.length} brakujących pozycji przed wyjazdem</div>` : ''}
+
+          ${cd.tips.length > 0 ? `
+          <details style="margin-top:6px">
+            <summary style="cursor:pointer;font-size:12px;color:var(--accent);letter-spacing:1px">💡 Wskazówki na ${cd.name}</summary>
+            <div class="tips-box" style="margin-top:8px">
+              ${cd.tips.map(t=>`<div class="tip-item"><span class="tip-cat">${t.cat}</span><span>${t.text}</span></div>`).join('')}
+            </div>
+          </details>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <div class="rally-days-left ${cls}">${d < 0 ? 'MINĄŁ' : `Za ${d}d`}</div>
+          <button class="btn btn-danger btn-sm" onclick="deleteRally('${r.id}')">🗑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openAddRally() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('r-date').value = today;
+  document.getElementById('modal-rally').classList.add('open');
+}
+
+function addRally() {
+  const name = document.getElementById('r-name').value.trim();
+  const country = document.getElementById('r-country').value;
+  const date = document.getElementById('r-date').value;
+  const duration = parseInt(document.getElementById('r-duration').value) || 7;
+  const notes = document.getElementById('r-notes').value.trim();
+
+  if (!name || !date) { toast('Podaj nazwę i datę!', 'error'); return; }
+
+  db.rallies.push({ id: genId('R'), name, country, date, duration, notes });
+  saveData();
+  closeModal('modal-rally');
+  renderCalendar();
+  toast(`✅ Dodano: ${name}`, 'success');
+
+  ['r-name','r-date','r-duration','r-notes'].forEach(id => document.getElementById(id).value = '');
+}
+
+function deleteRally(id) {
+  if (!confirm('Usunąć wyjazd?')) return;
+  db.rallies = db.rallies.filter(r => r.id !== id);
+  saveData();
+  renderCalendar();
+  toast('Wyjazd usunięty', 'error');
+}
+
+// ========================
+// MODALS
+// ========================
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-bg')) e.target.classList.remove('open'); });
+
+// ========================
+// EXPORT / IMPORT
+// ========================
+function exportCSV(mode) {
+  let products = db.products;
+  if (mode === 'low') products = products.filter(p => p.qty < p.min);
+  if (mode === 'expiry') products = products.filter(p => p.expiry && daysUntil(p.expiry) !== null && daysUntil(p.expiry) <= 45);
+
+  const header = ['ID','Kod','Nazwa','Kategoria','Stan','Jednostka','Minimum','Termin ważności','Lokalizacja','Notatki'];
+  const rows = products.map(p => [p.id, p.code, p.name, catLabels[p.cat]||p.cat, p.qty, p.unit, p.min, p.expiry||'', p.location||'', p.notes||'']);
+
+  const csv = [header, ...rows].map(r => r.map(v => `"${v}"`).join(';')).join('\n');
+  const BOM = '\uFEFF';
+  downloadFile(BOM + csv, `rally_stock_${mode}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8');
+  toast('Eksport CSV gotowy', 'success');
+}
+
+function exportJSON() {
+  downloadFile(JSON.stringify(db, null, 2), `rally_stock_backup_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+  toast('Backup JSON gotowy', 'success');
+}
+
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const imported = JSON.parse(evt.target.result);
+        if (imported.products && imported.rallies) {
+          db = imported;
+          saveData();
+          renderDashboard();
+          toast('✅ Backup wczytany pomyślnie', 'success');
+        } else {
+          toast('Nieprawidłowy format pliku', 'error');
+        }
+      } catch { toast('Błąd wczytywania pliku', 'error'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ========================
+// INIT
+// ========================
+renderDashboard();
+setInterval(() => {
+  // Check alerts every minute
+  const low = db.products.filter(p => p.qty < p.min);
+  const expiring = db.products.filter(p => p.expiry && daysUntil(p.expiry) !== null && daysUntil(p.expiry) <= 3);
+  if (expiring.length > 0) {
+    expiring.forEach(p => toast(`⏰ Termin ważności za mało dni: ${p.name}`, 'warning'));
+  }
+}, 60000);
+</script>
+</body>
+</html>
