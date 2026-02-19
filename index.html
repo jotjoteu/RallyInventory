@@ -1018,6 +1018,33 @@ function setSyncStatus(status) {
   if (status === 'offline') { el.textContent = '☁️❌'; el.title = 'Brak połączenia z chmurą'; }
 }
 
+function mapProductForSupabase(p) {
+  return {
+    id: p.id,
+    name: p.name || p.n || '',
+    category: p.category || p.cat || p.c || '',
+    qty: Number(p.qty || p.q || 0),
+    min_qty: Number(p.min_qty || p.minQty || p.min || 0),
+    unit: p.unit || p.u || 'szt',
+    expiry: p.expiry || p.exp || null,
+    notes: p.notes || p.note || null,
+    code: p.code || p.barcode || null,
+    location: p.location || p.loc || null
+  };
+}
+
+function mapRallyForSupabase(r) {
+  return {
+    id: r.id,
+    name: r.name || r.n || '',
+    country: r.country || r.c || null,
+    date: r.date || r.d || null,
+    duration: Number(r.duration || r.days || 0),
+    status: r.status || 'planned',
+    notes: r.notes || null
+  };
+}
+
 async function syncFromSupabase() {
   try {
     setSyncStatus('syncing');
@@ -1029,8 +1056,8 @@ async function syncFromSupabase() {
     if (e1 || e2) throw new Error('Supabase error');
 
     if (products.length === 0 && db.products.length > 0) {
-      await sb.from('products').upsert(db.products);
-      await sb.from('rallies').upsert(db.rallies);
+      await sb.from('products').upsert(db.products.map(mapProductForSupabase));
+      await sb.from('rallies').upsert(db.rallies.map(mapRallyForSupabase));
     } else if (products.length > 0) {
       db.products = products;
       db.rallies = rallies || [];
@@ -1048,7 +1075,10 @@ async function pushToSupabase(table, data, operation = 'upsert') {
   if (!navigator.onLine) return;
   try {
     if (operation === 'upsert') {
-      await sb.from(table).upsert(data);
+      let mapped = data;
+      if (table === 'products') mapped = mapProductForSupabase(data);
+      else if (table === 'rallies') mapped = mapRallyForSupabase(data);
+      await sb.from(table).upsert(mapped);
     } else if (operation === 'delete') {
       await sb.from(table).delete().eq('id', data.id);
     }
