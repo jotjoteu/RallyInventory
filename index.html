@@ -587,6 +587,46 @@
     main { padding: 12px; }
     .rally-card { flex-direction: column; }
   }
+
+  /* PACKING */
+  .inv-cb-wrap { display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  .inv-cb { display:none; }
+  .inv-cb-label {
+    width:18px; height:18px; border:2px solid var(--border); border-radius:3px;
+    display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:all .15s; flex-shrink:0;
+  }
+  .inv-cb:checked + .inv-cb-label { background:var(--accent); border-color:var(--accent); }
+  .inv-cb:checked + .inv-cb-label::after { content:'✓'; color:#0d0f0e; font-size:11px; font-weight:900; line-height:1; }
+  .pack-qty-input {
+    width:54px; padding:3px 5px; text-align:center; margin-top:5px; display:none;
+    background:var(--surface2); border:1px solid var(--border); border-radius:3px;
+    color:var(--text); font-size:12px;
+  }
+  .pack-qty-input.visible { display:block; }
+  .pack-btn-bar {
+    position:sticky; bottom:0; background:var(--bg); border-top:1px solid var(--border);
+    padding:12px 0; text-align:center; display:none;
+  }
+  .pack-btn-bar.visible { display:block; }
+  .pack-list-item {
+    display:flex; align-items:center; gap:12px;
+    padding:10px 16px; border-bottom:1px solid rgba(42,51,48,.5);
+  }
+  .pack-list-item:last-child { border-bottom:none; }
+  .pack-list-name { flex:1; font-size:13px; }
+  .pack-list-qty { font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--accent); min-width:50px; text-align:right; }
+  .pack-progress-bar { height:8px; background:var(--border); border-radius:4px; overflow:hidden; margin:8px 0 4px; }
+  .pack-progress-fill { height:100%; background:var(--accent); border-radius:4px; transition:width .3s; }
+  .pack-cb { display:none; }
+  .pack-cb-label {
+    width:20px; height:20px; border:2px solid var(--border); border-radius:3px;
+    display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:all .15s; flex-shrink:0;
+  }
+  .pack-cb:checked + .pack-cb-label { background:var(--ok); border-color:var(--ok); }
+  .pack-cb:checked + .pack-cb-label::after { content:'✓'; color:#0d0f0e; font-size:12px; font-weight:900; line-height:1; }
+  .pack-cb:checked ~ .pack-list-name { text-decoration:line-through; color:var(--text-dim); }
 </style>
 </head>
 <body>
@@ -608,6 +648,7 @@
   <button class="nav-btn" onclick="showView('add')" data-view="add">➕ Dodaj</button>
   <button class="nav-btn" onclick="showView('export')" data-view="export">⬇ Export</button>
   <button class="nav-btn" onclick="showView('history')" data-view="history">📜 Historia</button>
+  <button class="nav-btn" onclick="showView('packing')" data-view="packing">🎒 Pakowanie</button>
 </nav>
 
 <main>
@@ -647,11 +688,14 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>Produkt</th><th>Kategoria</th><th>Stan</th><th>Termin</th><th>Akcja</th>
+            <th style="width:28px;padding:8px 6px" aria-label="Wybierz do pakowania"></th><th>Produkt</th><th>Kategoria</th><th>Stan</th><th>Termin</th><th>Akcja</th>
           </tr></thead>
           <tbody id="inventory-tbody"></tbody>
         </table>
       </div>
+    </div>
+    <div class="pack-btn-bar" id="pack-btn-bar">
+      <button class="btn btn-primary" onclick="openPackingModal()">🎒 PAKUJ NA RAJD <span id="pack-count"></span></button>
     </div>
   </div>
 
@@ -828,6 +872,15 @@
     </div>
   </div>
 
+  <!-- PACKING LIST -->
+  <div class="view" id="view-packing">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:2px;text-transform:uppercase">Lista pakowania</h2>
+      <button class="btn btn-danger btn-sm" onclick="clearPackingList()">🗑️ Wyczyść listę</button>
+    </div>
+    <div id="packing-list-content"></div>
+  </div>
+
 </main>
 
 <!-- MODAL: dodaj wyjazd -->
@@ -890,6 +943,20 @@
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('modal-manual')">Anuluj</button>
       <button class="btn btn-primary" onclick="processManualCode()">Szukaj</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: pakowanie na rajd -->
+<div class="modal-bg" id="modal-packing">
+  <div class="modal">
+    <div class="modal-title" id="packing-modal-title">Pakujesz na: —</div>
+    <div id="packing-modal-items" style="margin-bottom:16px"></div>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:4px">Czy odjąć zaznaczone ilości ze stanu magazynu?</p>
+    <div class="modal-actions" style="flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="closeModal('modal-packing')">Anuluj</button>
+      <button class="btn btn-outline" onclick="confirmPacking(false)">📦 Nie, tylko dodaj do listy</button>
+      <button class="btn btn-primary" onclick="confirmPacking(true)">✅ Tak, odejmij</button>
     </div>
   </div>
 </div>
@@ -1059,8 +1126,14 @@ async function syncFromSupabase() {
       await sb.from('products').upsert(db.products.map(mapProductForSupabase));
       await sb.from('rallies').upsert(db.rallies.map(mapRallyForSupabase));
     } else if (products.length > 0) {
+      const localPackingMap = {};
+      (db.rallies || []).forEach(r => { if (r.packingList) localPackingMap[r.id] = r.packingList; });
       db.products = products;
-      db.rallies = rallies || [];
+      db.rallies = (rallies || []).map(r => {
+        let pl = r.packingList;
+        if (typeof pl === 'string') { try { pl = JSON.parse(pl); } catch(e) { pl = null; } }
+        return Object.assign({}, r, { packingList: pl || localPackingMap[r.id] || [] });
+      });
       saveData();
       renderAll();
     }
@@ -1100,6 +1173,7 @@ function showView(v) {
   if (v === 'calendar') renderCalendar();
   if (v === 'scanner') stopScanner();
   if (v === 'history') renderHistory();
+  if (v === 'packing') renderPackingList();
 }
 
 // ========================
@@ -1271,6 +1345,7 @@ function quickAdd(id) {
 // INVENTORY
 // ========================
 let activeFilter = 'all';
+let packingSelection = {}; // { productId: qty }
 
 function renderInventory() {
   // chips
@@ -1293,8 +1368,18 @@ function renderInventory() {
   tbody.innerHTML = products.map(p => {
     const sc = stockClass(p.qty, p.min);
     const ec = p.expiry ? expiryClass(p.expiry) : '';
+    const isSelected = !!packingSelection[p.id];
+    const packQty = packingSelection[p.id] || 1;
     return `
       <tr>
+        <td style="padding:8px 6px;text-align:center">
+          <div class="inv-cb-wrap">
+            <input type="checkbox" class="inv-cb" id="pack-cb-${p.id}" ${isSelected ? 'checked' : ''} onchange="togglePackItem('${p.id}')">
+            <label class="inv-cb-label" for="pack-cb-${p.id}"></label>
+            <input type="number" class="pack-qty-input${isSelected ? ' visible' : ''}" id="pack-qty-${p.id}"
+              value="${packQty}" min="1" max="${p.qty}" oninput="updatePackQty('${p.id}', this.value)">
+          </div>
+        </td>
         <td>
           <div><strong>${p.name}</strong></div>
           <div style="font-size:11px;color:var(--text-dim)">${p.code} · ${p.location || ''}</div>
@@ -1317,7 +1402,8 @@ function renderInventory() {
         </td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Brak produktów</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:var(--text-dim);text-align:center;padding:20px">Brak produktów</td></tr>';
+  updatePackingBtn();
 }
 
 function setFilter(f) { activeFilter = f; renderInventory(); }
@@ -1360,6 +1446,149 @@ function editProduct(id) {
   db.products = db.products.filter(x => x.id !== id);
   showView('add');
   toast('Edytuj produkt i zapisz', 'default');
+}
+
+function togglePackItem(id) {
+  const cb = document.getElementById('pack-cb-' + id);
+  const qtyInput = document.getElementById('pack-qty-' + id);
+  if (cb && cb.checked) {
+    const p = db.products.find(x => x.id === id);
+    packingSelection[id] = (p && p.qty > 0) ? 1 : 0;
+    if (qtyInput) { qtyInput.value = packingSelection[id]; qtyInput.classList.add('visible'); }
+  } else {
+    delete packingSelection[id];
+    if (qtyInput) qtyInput.classList.remove('visible');
+  }
+  updatePackingBtn();
+}
+
+function updatePackQty(id, val) {
+  const p = db.products.find(x => x.id === id);
+  const max = p ? p.qty : 999;
+  packingSelection[id] = Math.min(max, Math.max(1, parseInt(val) || 1));
+  const qtyInput = document.getElementById('pack-qty-' + id);
+  if (qtyInput) qtyInput.value = packingSelection[id];
+}
+
+function updatePackingBtn() {
+  const count = Object.keys(packingSelection).length;
+  const bar = document.getElementById('pack-btn-bar');
+  const countEl = document.getElementById('pack-count');
+  if (bar) bar.classList.toggle('visible', count > 0);
+  if (countEl) countEl.textContent = count > 0 ? `(${count})` : '';
+}
+
+function openPackingModal() {
+  const nextRally = getNextRally();
+  if (!nextRally) { toast('Brak zaplanowanych wyjazdów!', 'error'); return; }
+  document.getElementById('packing-modal-title').textContent = `Pakujesz na: ${nextRally.name}`;
+  const selectedItems = Object.entries(packingSelection).map(([pid, qty]) => {
+    const p = db.products.find(x => x.id === pid);
+    return p ? { name: p.name, qty, unit: p.unit } : null;
+  }).filter(Boolean);
+  document.getElementById('packing-modal-items').innerHTML =
+    selectedItems.map(item => `
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(42,51,48,.5);font-size:13px">
+        <span>${item.name}</span>
+        <span style="font-family:var(--font-display);font-weight:700;color:var(--accent)">${item.qty} ${item.unit || 'szt'}</span>
+      </div>
+    `).join('');
+  document.getElementById('modal-packing').classList.add('open');
+}
+
+function confirmPacking(deduct) {
+  const nextRally = getNextRally();
+  if (!nextRally) return;
+  if (!nextRally.packingList) nextRally.packingList = [];
+  const selectedItems = Object.entries(packingSelection).map(([pid, qty]) => {
+    const p = db.products.find(x => x.id === pid);
+    return p ? { productId: pid, productName: p.name, qty: parseInt(qty) || 1, unit: p.unit, packed: false } : null;
+  }).filter(Boolean);
+  selectedItems.forEach(item => {
+    const existing = nextRally.packingList.find(x => x.productId === item.productId);
+    if (existing) { existing.qty += item.qty; }
+    else { nextRally.packingList.push(item); }
+    if (deduct) {
+      const p = db.products.find(x => x.id === item.productId);
+      if (p) {
+        const before = p.qty;
+        p.qty = Math.max(0, p.qty - item.qty);
+        logHistory('qty_change', { productId: p.id, productName: p.name, delta: p.qty - before, qtyBefore: before, qtyAfter: p.qty, note: `Pakowanie na rajd: ${nextRally.name}` });
+        pushToSupabase('products', p);
+      }
+    }
+  });
+  saveData();
+  pushToSupabase('rallies', nextRally);
+  packingSelection = {};
+  updatePackingBtn();
+  closeModal('modal-packing');
+  document.querySelectorAll('.inv-cb').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.pack-qty-input').forEach(el => el.classList.remove('visible'));
+  logHistory('packing', { note: `Pakowanie na rajd: ${nextRally.name} (${selectedItems.length} pozycji)` });
+  toast(`✅ Dodano do listy pakowania na ${nextRally.name}`, 'success');
+}
+
+function renderPackingList() {
+  const nextRally = getNextRally();
+  const el = document.getElementById('packing-list-content');
+  if (!nextRally) {
+    el.innerHTML = '<div class="card" style="color:var(--text-dim);text-align:center;padding:30px">Brak zaplanowanych wyjazdów</div>';
+    return;
+  }
+  const list = nextRally.packingList || [];
+  const cd = countryData[nextRally.country] || countryData.other;
+  const d = daysUntil(nextRally.date);
+  const packed = list.filter(x => x.packed).length;
+  const total = list.length;
+  const pct = total > 0 ? Math.round((packed / total) * 100) : 0;
+  const headerHTML = `
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-family:var(--font-display);font-size:18px;font-weight:800;margin-bottom:4px">${cd.flag} ${nextRally.name}</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:${total > 0 ? '10px' : '0'}">${nextRally.date} · Za ${d} dni</div>
+      ${total > 0 ? `
+        <div style="font-size:13px;margin-bottom:4px;color:var(--text-dim)">${packed}/${total} spakowano</div>
+        <div class="pack-progress-bar"><div class="pack-progress-fill" style="width:${pct}%"></div></div>
+      ` : ''}
+    </div>
+  `;
+  if (list.length === 0) {
+    el.innerHTML = headerHTML + '<div class="card" style="color:var(--text-dim);text-align:center;padding:20px">Lista pakowania jest pusta.<br>Przejdź do Magazynu, zaznacz produkty i kliknij 🎒 PAKUJ NA RAJD.</div>';
+    return;
+  }
+  const itemsHTML = `
+    <div class="card" style="padding:0">
+      ${list.map((item, idx) => `
+        <div class="pack-list-item">
+          <input type="checkbox" class="pack-cb" id="pack-item-${idx}" ${item.packed ? 'checked' : ''} onchange="togglePackedItem('${nextRally.id}', ${idx}, this.checked)">
+          <label class="pack-cb-label" for="pack-item-${idx}"></label>
+          <span class="pack-list-name">${item.productName}</span>
+          <span class="pack-list-qty">${item.qty} ${item.unit || 'szt'}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  el.innerHTML = headerHTML + itemsHTML;
+}
+
+function togglePackedItem(rallyId, idx, checked) {
+  const rally = db.rallies.find(r => r.id === rallyId);
+  if (!rally || !rally.packingList) return;
+  rally.packingList[idx].packed = checked;
+  saveData();
+  pushToSupabase('rallies', rally);
+  renderPackingList();
+}
+
+function clearPackingList() {
+  const nextRally = getNextRally();
+  if (!nextRally) return;
+  if (!confirm('Wyczyścić listę pakowania?')) return;
+  nextRally.packingList = [];
+  saveData();
+  pushToSupabase('rallies', nextRally);
+  renderPackingList();
+  toast('Lista pakowania wyczyszczona', 'default');
 }
 
 // ========================
@@ -1784,6 +2013,7 @@ function actionDisplay(e) {
     case 'add_rally':    return { icon: '🏁', cls: 'hist-accent' };
     case 'delete_rally': return { icon: '❌', cls: 'hist-danger' };
     case 'import':       return { icon: '📥', cls: 'hist-blue' };
+    case 'packing':      return { icon: '🎒', cls: 'hist-accent' };
     default:             return { icon: '•', cls: '' };
   }
 }
