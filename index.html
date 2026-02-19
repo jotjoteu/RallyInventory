@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root {
     --bg: #0d0f0e;
@@ -596,6 +597,7 @@
     <div id="team-name">Zespół Rajdowy</div>
     <div id="current-date"></div>
   </div>
+  <span id="sync-indicator" title="Status synchronizacji z chmurą" style="font-size:16px; cursor:default;">☁️</span>
 </header>
 
 <nav>
@@ -1002,8 +1004,61 @@ function getDefaultData() {
 let db = loadData();
 
 // ========================
-// NAVIGATION
+// SUPABASE
 // ========================
+const SUPABASE_URL = 'https://nbcapvivcucxnscojuum.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iY2Fwdml2Y3VjeG5zY29qdXVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1MTA0NTksImV4cCI6MjA4NzA4NjQ1OX0.0C6OgTLQwl9Z-2r8W_FF1QLZ-ttsbAEHGi71SK79BVw';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  if (status === 'online')  { el.textContent = '☁️✅'; el.title = 'Zsynchronizowano z chmurą'; }
+  if (status === 'syncing') { el.textContent = '☁️⏳'; el.title = 'Synchronizowanie...'; }
+  if (status === 'offline') { el.textContent = '☁️❌'; el.title = 'Brak połączenia z chmurą'; }
+}
+
+async function syncFromSupabase() {
+  try {
+    setSyncStatus('syncing');
+    const [{ data: products, error: e1 }, { data: rallies, error: e2 }] = await Promise.all([
+      sb.from('products').select('*'),
+      sb.from('rallies').select('*')
+    ]);
+
+    if (e1 || e2) throw new Error('Supabase error');
+
+    if (products.length === 0 && db.products.length > 0) {
+      await sb.from('products').upsert(db.products);
+      await sb.from('rallies').upsert(db.rallies);
+    } else if (products.length > 0) {
+      db.products = products;
+      db.rallies = rallies || [];
+      saveData();
+      renderAll();
+    }
+    setSyncStatus('online');
+  } catch(e) {
+    console.warn('Supabase sync failed:', e);
+    setSyncStatus('offline');
+  }
+}
+
+async function pushToSupabase(table, data, operation = 'upsert') {
+  if (!navigator.onLine) return;
+  try {
+    if (operation === 'upsert') {
+      await sb.from(table).upsert(data);
+    } else if (operation === 'delete') {
+      await sb.from(table).delete().eq('id', data.id);
+    }
+  } catch(e) {
+    console.warn('Push error:', e);
+    setSyncStatus('offline');
+  }
+}
+
+
 function showView(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -1244,6 +1299,7 @@ function changeQty(id, delta) {
   p.qty = Math.max(0, p.qty + delta);
   saveData();
   logHistory('qty_change', { productId: p.id, productName: p.name, delta: p.qty - before, qtyBefore: before, qtyAfter: p.qty, note: 'Zmiana ręczna' });
+  pushToSupabase('products', p);
   renderInventory();
   if (p.qty < p.min) toast(`⚠ ${p.name}: stan poniżej minimum!`, 'warning');
 }
@@ -1254,6 +1310,7 @@ function deleteProduct(id) {
   db.products = db.products.filter(x => x.id !== id);
   saveData();
   if (p) logHistory('delete_product', { productId: p.id, productName: p.name, note: 'Usunięto produkt' });
+  pushToSupabase('products', { id }, 'delete');
   renderInventory();
   toast('Produkt usunięty', 'error');
 }
@@ -1295,6 +1352,7 @@ function addProduct() {
   db.products.push(newProduct);
   saveData();
   logHistory('add_product', { productId: newProduct.id, productName: name, qtyAfter: qty, note: 'Dodano produkt' });
+  pushToSupabase('products', newProduct);
   clearAddForm();
   toast(`✅ Dodano: ${name}`, 'success');
   showView('inventory');
@@ -1507,6 +1565,7 @@ function addRally() {
   db.rallies.push(newRally);
   saveData();
   logHistory('add_rally', { note: `Dodano wyjazd: ${name} (${date})` });
+  pushToSupabase('rallies', newRally);
   closeModal('modal-rally');
   renderCalendar();
   toast(`✅ Dodano: ${name}`, 'success');
@@ -1520,6 +1579,7 @@ function deleteRally(id) {
   db.rallies = db.rallies.filter(x => x.id !== id);
   saveData();
   if (r) logHistory('delete_rally', { note: `Usunięto wyjazd: ${r.name}` });
+  pushToSupabase('rallies', { id }, 'delete');
   renderCalendar();
   toast('Wyjazd usunięty', 'error');
 }
@@ -1711,7 +1771,12 @@ function clearHistory() {
 // ========================
 // INIT
 // ========================
+function renderAll() {
+  renderDashboard();
+}
+
 renderDashboard();
+syncFromSupabase();
 setInterval(() => {
   // Check alerts every minute
   const low = db.products.filter(p => p.qty < p.min);
