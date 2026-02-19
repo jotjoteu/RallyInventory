@@ -587,6 +587,79 @@
     main { padding: 12px; }
     .rally-card { flex-direction: column; }
   }
+
+  /* PACKING FEATURE */
+  .pack-check { display: none; }
+  .pack-check-box {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s;
+    flex-shrink: 0;
+  }
+  .pack-check:checked + .pack-check-box { background: var(--accent); border-color: var(--accent); }
+  .pack-check:checked + .pack-check-box::after {
+    content: '';
+    width: 10px; height: 6px;
+    border-left: 2px solid #0d0f0e;
+    border-bottom: 2px solid #0d0f0e;
+    transform: rotate(-45deg) translateY(-1px);
+    display: block;
+  }
+  .pack-qty-input {
+    width: 60px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 3px 8px;
+    font-size: 13px;
+    font-family: var(--font-body);
+  }
+  .pack-fab {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    z-index: 200;
+    background: var(--accent);
+    color: #0d0f0e;
+    border: none;
+    border-radius: 28px;
+    padding: 12px 22px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(200,245,58,.4);
+    display: none;
+    align-items: center;
+    gap: 8px;
+    transition: all .2s;
+  }
+  .pack-fab:hover { background: #d4ff44; transform: translateY(-2px); }
+  .pack-fab.visible { display: flex; }
+  .packing-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .packing-item:last-child { border-bottom: none; }
+  .packing-item.packed .pack-item-name { text-decoration: line-through; color: var(--text-dim); }
+  .packing-progress {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .packing-progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
 </style>
 </head>
 <body>
@@ -647,7 +720,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>Produkt</th><th>Kategoria</th><th>Stan</th><th>Termin</th><th>Akcja</th>
+            <th style="width:32px"></th><th>Produkt</th><th>Kategoria</th><th>Stan</th><th>Termin</th><th>Akcja</th>
           </tr></thead>
           <tbody id="inventory-tbody"></tbody>
         </table>
@@ -706,6 +779,19 @@
       <button class="btn btn-primary btn-sm" onclick="openAddRally()">+ Dodaj wyjazd</button>
     </div>
     <div id="rally-list"></div>
+
+    <!-- PACKING LIST SECTION -->
+    <div id="packing-section" style="margin-top:24px;display:none">
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🎒 Lista pakowania: <span id="packing-rally-name" style="color:var(--accent)"></span></span>
+          <button class="btn btn-danger btn-sm" onclick="clearPackingList()">🗑️ Wyczyść listę</button>
+        </div>
+        <div class="packing-progress"><div class="packing-progress-bar" id="packing-progress-bar" style="width:0%"></div></div>
+        <div id="packing-progress-label" style="font-size:12px;color:var(--text-dim);margin-bottom:12px">0 / 0 spakowanych</div>
+        <div id="packing-items-list"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ADD PRODUCT -->
@@ -829,6 +915,23 @@
   </div>
 
 </main>
+
+<!-- FLOATING PACK BUTTON -->
+<button class="pack-fab" id="pack-fab" onclick="openPackModal()">🎒 PAKUJ NA RAJD (<span id="pack-count">0</span>)</button>
+
+<!-- MODAL: pakuj na rajd -->
+<div class="modal-bg" id="modal-packing">
+  <div class="modal">
+    <div class="modal-title">🎒 Pakujesz na: <span id="pack-modal-rally-name" style="color:var(--accent)"></span></div>
+    <div id="pack-modal-items" style="margin:16px 0;max-height:260px;overflow-y:auto"></div>
+    <p style="font-size:14px;margin-bottom:8px;color:var(--text-dim)">Czy odjąć zaznaczone ilości ze stanu magazynu?</p>
+    <div class="modal-actions" style="flex-wrap:wrap;gap:8px">
+      <button class="btn btn-outline" onclick="closeModal('modal-packing')">Anuluj</button>
+      <button class="btn btn-outline" onclick="confirmPack(false)">📦 Nie, tylko dodaj do listy</button>
+      <button class="btn btn-primary" onclick="confirmPack(true)">✅ Tak, odejmij ze stanu</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: dodaj wyjazd -->
 <div class="modal-bg" id="modal-rally">
@@ -1100,6 +1203,9 @@ function showView(v) {
   if (v === 'calendar') renderCalendar();
   if (v === 'scanner') stopScanner();
   if (v === 'history') renderHistory();
+
+  const fab = document.getElementById('pack-fab');
+  if (fab) fab.classList.toggle('visible', v === 'inventory' && Object.keys(packSelected).length > 0);
 }
 
 // ========================
@@ -1293,8 +1399,17 @@ function renderInventory() {
   tbody.innerHTML = products.map(p => {
     const sc = stockClass(p.qty, p.min);
     const ec = p.expiry ? expiryClass(p.expiry) : '';
+    const checked = packSelected[p.id] !== undefined;
+    const packQty = packSelected[p.id] || 1;
     return `
       <tr>
+        <td style="text-align:center;vertical-align:middle">
+          <label style="display:inline-flex;align-items:center;cursor:pointer">
+            <input type="checkbox" class="pack-check" id="pck-${p.id}" ${checked ? 'checked' : ''} onchange="togglePackItem('${p.id}', ${p.qty})">
+            <span class="pack-check-box"></span>
+          </label>
+          ${checked ? `<br><input type="number" class="pack-qty-input" id="pck-qty-${p.id}" value="${packQty}" min="1" max="${p.qty}" oninput="updatePackQty('${p.id}', this.value, ${p.qty})">` : ''}
+        </td>
         <td>
           <div><strong>${p.name}</strong></div>
           <div style="font-size:11px;color:var(--text-dim)">${p.code} · ${p.location || ''}</div>
@@ -1317,7 +1432,9 @@ function renderInventory() {
         </td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="5" style="color:var(--text-dim);text-align:center;padding:20px">Brak produktów</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:var(--text-dim);text-align:center;padding:20px">Brak produktów</td></tr>';
+
+  updatePackFab();
 }
 
 function setFilter(f) { activeFilter = f; renderInventory(); }
@@ -1533,6 +1650,7 @@ function renderCalendar() {
 
   if (sorted.length === 0) {
     el.innerHTML = '<div class="card" style="color:var(--text-dim);text-align:center;padding:30px">Brak zaplanowanych wyjazdów</div>';
+    renderPackingList();
     return;
   }
 
@@ -1574,6 +1692,8 @@ function renderCalendar() {
       </div>
     `;
   }).join('');
+
+  renderPackingList();
 }
 
 function openAddRally() {
@@ -1796,6 +1916,157 @@ function clearHistory() {
   saveData();
   renderHistory();
   toast('Historia wyczyszczona', 'error');
+}
+
+// ========================
+// PACKING FEATURE
+// ========================
+let packSelected = {}; // { productId: qty }
+
+function togglePackItem(id, maxQty) {
+  const cb = document.getElementById('pck-' + id);
+  if (cb && cb.checked) {
+    packSelected[id] = 1;
+  } else {
+    delete packSelected[id];
+  }
+  renderInventory();
+}
+
+function updatePackQty(id, val, maxQty) {
+  let v = parseInt(val) || 1;
+  v = Math.max(1, Math.min(v, maxQty));
+  packSelected[id] = v;
+  updatePackFab();
+}
+
+function updatePackFab() {
+  const count = Object.keys(packSelected).length;
+  const fab = document.getElementById('pack-fab');
+  const countEl = document.getElementById('pack-count');
+  if (countEl) countEl.textContent = count;
+  const inventoryActive = document.getElementById('view-inventory') && document.getElementById('view-inventory').classList.contains('active');
+  if (fab) fab.classList.toggle('visible', count > 0 && inventoryActive);
+}
+
+function openPackModal() {
+  const rally = getNextRally();
+  const rallyNameEl = document.getElementById('pack-modal-rally-name');
+  if (!rally) {
+    toast('Brak zaplanowanych wyjazdów — dodaj rajd w Kalendarzu', 'warning');
+    return;
+  }
+  rallyNameEl.textContent = rally.name;
+
+  const items = Object.entries(packSelected).map(([id, qty]) => {
+    const p = db.products.find(x => x.id === id);
+    if (!p) return null;
+    const qtyInput = document.getElementById('pck-qty-' + id);
+    const liveQty = qtyInput ? Math.max(1, Math.min(parseInt(qtyInput.value)||qty, p.qty)) : qty;
+    packSelected[id] = liveQty;
+    return { p, qty: liveQty };
+  }).filter(Boolean);
+
+  const itemsEl = document.getElementById('pack-modal-items');
+  itemsEl.innerHTML = items.map(({ p, qty }) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span>${p.name}</span>
+      <span style="color:var(--accent);font-weight:700">${qty} ${p.unit}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('modal-packing').classList.add('open');
+}
+
+function confirmPack(deductStock) {
+  const rally = getNextRally();
+  if (!rally) return;
+
+  const items = Object.entries(packSelected).map(([id, qty]) => {
+    const p = db.products.find(x => x.id === id);
+    if (!p) return null;
+    return { productId: id, name: p.name, qty, unit: p.unit, packed: false };
+  }).filter(Boolean);
+
+  if (!rally.packing_list) rally.packing_list = [];
+  items.forEach(item => {
+    const existing = rally.packing_list.find(x => x.productId === item.productId);
+    if (existing) {
+      existing.qty += item.qty;
+    } else {
+      rally.packing_list.push(item);
+    }
+  });
+
+  if (deductStock) {
+    items.forEach(item => {
+      const p = db.products.find(x => x.id === item.productId);
+      if (p) {
+        const before = p.qty;
+        p.qty = Math.max(0, p.qty - item.qty);
+        logHistory('qty_change', { productId: p.id, productName: p.name, delta: p.qty - before, qtyBefore: before, qtyAfter: p.qty, note: 'Pakowanie na rajd: ' + rally.name });
+        pushToSupabase('products', p);
+      }
+    });
+  }
+
+  packSelected = {};
+  closeModal('modal-packing');
+  saveData();
+  pushToSupabase('rallies', rally);
+  renderInventory();
+  toast(`✅ Dodano ${items.length} produktów do listy pakowania na ${rally.name}`, 'success');
+}
+
+function renderPackingList() {
+  const rally = getNextRally();
+  const section = document.getElementById('packing-section');
+  if (!section) return;
+  if (!rally || !rally.packing_list || rally.packing_list.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  document.getElementById('packing-rally-name').textContent = rally.name;
+
+  const list = rally.packing_list;
+  const total = list.length;
+  const packed = list.filter(i => i.packed).length;
+  const pct = total > 0 ? Math.round(packed / total * 100) : 0;
+
+  document.getElementById('packing-progress-bar').style.width = pct + '%';
+  document.getElementById('packing-progress-label').textContent = `${packed} / ${total} spakowanych`;
+
+  document.getElementById('packing-items-list').innerHTML = list.map((item, idx) => `
+    <div class="packing-item ${item.packed ? 'packed' : ''}">
+      <label style="display:inline-flex;align-items:center;cursor:pointer">
+        <input type="checkbox" class="pack-check" ${item.packed ? 'checked' : ''} onchange="togglePackedItem(${idx})">
+        <span class="pack-check-box"></span>
+      </label>
+      <span class="pack-item-name" style="flex:1">${item.name}</span>
+      <span style="color:var(--accent);font-weight:700;font-size:14px">${item.qty} ${item.unit||'szt'}</span>
+    </div>
+  `).join('') || '<div style="color:var(--text-dim);text-align:center;padding:20px">Brak pozycji</div>';
+}
+
+function togglePackedItem(idx) {
+  const rally = getNextRally();
+  if (!rally || !rally.packing_list) return;
+  rally.packing_list[idx].packed = !rally.packing_list[idx].packed;
+  saveData();
+  pushToSupabase('rallies', rally);
+  renderPackingList();
+}
+
+function clearPackingList() {
+  const rally = getNextRally();
+  if (!rally) return;
+  if (!confirm('Wyczyścić listę pakowania?')) return;
+  rally.packing_list = [];
+  saveData();
+  pushToSupabase('rallies', rally);
+  renderPackingList();
+  toast('Lista pakowania wyczyszczona', 'error');
 }
 
 // ========================
