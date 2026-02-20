@@ -676,6 +676,7 @@
 <nav>
   <button class="nav-btn active" onclick="showView('dashboard')" data-view="dashboard">⚡ Dashboard</button>
   <button class="nav-btn" onclick="showView('inventory')" data-view="inventory">📦 Magazyn</button>
+  <button class="nav-btn" onclick="showView('packing')" data-view="packing">🎒 Pakowanie</button>
   <button class="nav-btn" onclick="showView('scanner')" data-view="scanner">📷 Skaner</button>
   <button class="nav-btn" onclick="showView('calendar')" data-view="calendar">🗓 Kalendarz</button>
   <button class="nav-btn" onclick="showView('add')" data-view="add">➕ Dodaj</button>
@@ -770,6 +771,14 @@
         <button class="btn btn-danger btn-sm" onclick="scanRemoveStock()">➖ Zdejmij ze stanu</button>
       </div>
     </div>
+  </div>
+
+  <!-- PACKING -->
+  <div class="view" id="view-packing">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:2px;text-transform:uppercase">🎒 Lista pakowania</h2>
+    </div>
+    <div id="view-packing-content"></div>
   </div>
 
   <!-- CALENDAR -->
@@ -1201,6 +1210,7 @@ function showView(v) {
   if (v === 'dashboard') renderDashboard();
   if (v === 'inventory') renderInventory();
   if (v === 'calendar') renderCalendar();
+  if (v === 'packing') renderPackingView();
   if (v === 'scanner') stopScanner();
   if (v === 'history') renderHistory();
 
@@ -2016,6 +2026,79 @@ function confirmPack(deductStock) {
   pushToSupabase('rallies', rally);
   renderInventory();
   toast(`✅ Dodano ${items.length} produktów do listy pakowania na ${rally.name}`, 'success');
+}
+
+function renderPackingView() {
+  const el = document.getElementById('view-packing-content');
+  if (!el) return;
+  const rally = getNextRally();
+
+  if (!rally) {
+    el.innerHTML = '<div class="card" style="color:var(--text-dim);text-align:center;padding:30px">Brak zaplanowanych wyjazdów</div>';
+    return;
+  }
+
+  if (!rally.packing_list || rally.packing_list.length === 0) {
+    el.innerHTML = `
+      <div class="card" style="padding:20px">
+        <div style="color:var(--accent);font-weight:700;margin-bottom:4px">${rally.name}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px">${rally.date}</div>
+        <div style="color:var(--text-dim);text-align:center;padding:20px">Brak produktów do spakowania. Przejdź do Magazynu i użyj przycisku 🎒 PAKUJ NA RAJD</div>
+      </div>`;
+    return;
+  }
+
+  const list = rally.packing_list;
+  const total = list.length;
+  const packed = list.filter(i => i.packed).length;
+  const pct = total > 0 ? Math.round(packed / total * 100) : 0;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="color:var(--accent);font-weight:700">${rally.name}</div>
+          <div style="font-size:12px;color:var(--text-dim)">${rally.date}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="clearPackingListView()">🗑️ Wyczyść listę pakowania</button>
+      </div>
+      <div class="packing-progress"><div class="packing-progress-bar" id="packing-view-progress-bar" style="width:${pct}%"></div></div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">${packed} / ${total} spakowanych</div>
+      <div id="packing-view-items-list">
+        ${list.map((item, idx) => `
+          <div class="packing-item ${item.packed ? 'packed' : ''}">
+            <label style="display:inline-flex;align-items:center;cursor:pointer">
+              <input type="checkbox" class="pack-check" ${item.packed ? 'checked' : ''} onchange="togglePackedItemView(${idx})">
+              <span class="pack-check-box"></span>
+            </label>
+            <span class="pack-item-name" style="flex:1">${item.name}</span>
+            <span style="color:var(--accent);font-weight:700;font-size:14px">${item.qty} ${item.unit||'szt'}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+function togglePackedItemView(idx) {
+  const rally = getNextRally();
+  if (!rally || !rally.packing_list) return;
+  rally.packing_list[idx].packed = !rally.packing_list[idx].packed;
+  saveData();
+  pushToSupabase('rallies', rally);
+  renderPackingView();
+  renderPackingList();
+}
+
+function clearPackingListView() {
+  const rally = getNextRally();
+  if (!rally) return;
+  if (!confirm('Wyczyścić listę pakowania?')) return;
+  rally.packing_list = [];
+  saveData();
+  pushToSupabase('rallies', rally);
+  renderPackingView();
+  renderPackingList();
+  toast('Lista pakowania wyczyszczona', 'error');
 }
 
 function renderPackingList() {
