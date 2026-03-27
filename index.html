@@ -2105,12 +2105,19 @@ function renderPackingList() {
   const rally = getNextRally();
   const section = document.getElementById('packing-section');
   if (!section) return;
-  if (!rally || !rally.packing_list || rally.packing_list.length === 0) {
+  if (!rally) {
     section.style.display = 'none';
     return;
   }
   section.style.display = '';
   document.getElementById('packing-rally-name').textContent = rally.name;
+
+  if (!rally.packing_list || rally.packing_list.length === 0) {
+    document.getElementById('packing-progress-bar').style.width = '0%';
+    document.getElementById('packing-progress-label').textContent = '0 / 0 spakowanych';
+    document.getElementById('packing-items-list').innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:20px">Brak pozycji — przejdź do <span style="color:var(--accent);cursor:pointer" onclick="showView(\'inventory\')">Magazynu</span> i użyj przycisku 🎒 PAKUJ NA RAJD</div>';
+    return;
+  }
 
   const list = rally.packing_list;
   const total = list.length;
